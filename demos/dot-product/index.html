@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>向量加法 · 点积</title>
+  <link rel="stylesheet" href="../../shared/style.css" />
+
+  <!-- 第三方库:p5.js + KaTeX(CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+  <!-- 项目公共层 -->
+  <script src="../../shared/math-canvas.js"></script>
+  <script src="../../shared/katex-setup.js"></script>
+</head>
+<body>
+  <main class="demo">
+    <div class="canvas-holder" id="canvas-holder"></div>
+
+    <section class="panel">
+      <a class="back" href="../../index.html">← 返回合集</a>
+      <h1>向量加法 · 点积</h1>
+      <div class="sub">拖动 <span class="a">●</span> 与 <span class="b">●</span> 两个箭头端点</div>
+
+      <div class="row"><span class="k a">向量 a</span><span class="val a" id="va">(0, 0)</span></div>
+      <div class="row"><span class="k b">向量 b</span><span class="val b" id="vb">(0, 0)</span></div>
+      <div class="row"><span class="k sum">a + b</span><span class="val sum" id="vsum">(0, 0)</span></div>
+
+      <div class="formula">$$ a \cdot b = |a|\,|b|\cos\theta $$</div>
+
+      <div class="row"><span class="k">点积 a · b</span><span class="val" id="dot">0</span></div>
+      <div class="row"><span class="k">夹角 θ</span><span class="val" id="theta">0°</span></div>
+      <div class="row"><span class="k proj">a 在 b 上的投影</span><span class="val proj" id="proj">0</span></div>
+
+      <label><input type="checkbox" id="showProj" checked /> 显示投影(点积的几何意义)</label>
+      <label><input type="checkbox" id="showSum" checked /> 显示平行四边形 a + b</label>
+
+      <div class="hint">
+        点积 = |b| × (a 投影到 b 的长度)。<br>
+        同向为正,垂直为 0,反向为负 —— 拖动试试。
+      </div>
+    </section>
+  </main>
+
+  <script src="sketch.js"></script>
+</body>
+</html>
