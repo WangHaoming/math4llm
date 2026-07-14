@@ -39,7 +39,7 @@ FILES = {
 
 SIZE = 14          # 降采样后的边长
 N_TRAIN_PER = 1200  # 训练集每类张数 → 共 12000
-# 实测（torch 对照）：3000 张 ~91%，6000 张 ~94%，12000 张 + 动量/衰减/增强 ~97%。
+# 实测（纯 SGD lr=0.2）：6000 张 ~94%，12000 张 ~96%，60000 张 ~98%。
 # 页面「改进实验室」关闭"教材翻倍"开关时只用前 6000 张。
 N_TEST_PER = 50    # 测试集每类张数 → 共 500
 SEED = 42
@@ -173,9 +173,9 @@ def write_full_js(images: bytes, labels: bytes, rows: int, cols: int) -> Path:
 def check_with_torch(train_i: bytes, train_l: bytes, test_i: bytes, test_l: bytes) -> None:
     """用 torch 按 JS 侧「改进全开」配置训一遍，打印前几步 loss 和最终正确率。
 
-    配置与页面步骤 3 的改进实验室默认值一致：
-    batch=32、lr=0.05、动量 0.9、学习率线性衰减到 10%、±1 像素随机平移增强、20 epoch。
-    目的：1) 确认此配置能到 ~97%；2) 给 JS 手写实现提供数值对照。
+    配置与页面步骤 3 的改进实验室「全开」一致：
+    batch=32、纯 SGD lr=0.2（无动量、无学习率衰减）、±1 像素随机平移增强、20 epoch。
+    目的：1) 确认此配置的正确率；2) 给 JS 手写实现提供数值对照。
     """
     import torch
     import torch.nn.functional as F
@@ -209,16 +209,14 @@ def check_with_torch(train_i: bytes, train_l: bytes, test_i: bytes, test_l: byte
     params = (w1, b1, w2, b2)
     for p in params:
         p.requires_grad_(True)
-    vels = [torch.zeros_like(p) for p in params]
 
-    batch, lr, momentum, epochs = 32, 0.05, 0.9, 20
+    batch, lr, epochs = 32, 0.2, 20   # 纯 SGD，固定步长
     n = len(ytr)
     total = epochs * (n // batch)
     step = 0
     for epoch in range(epochs):
         perm = torch.randperm(n, generator=g)
         for s in range(0, n - batch + 1, batch):
-            cur_lr = lr * (1 - 0.9 * step / total)   # 线性衰减到 10%
             idx = perm[s:s + batch]
             h = (shift_batch(xtr[idx], g) @ w1 + b1).relu()
             loss = F.cross_entropy(h @ w2 + b2, ytr[idx])
@@ -226,9 +224,8 @@ def check_with_torch(train_i: bytes, train_l: bytes, test_i: bytes, test_l: byte
                 p.grad = None
             loss.backward()
             with torch.no_grad():
-                for p, v in zip(params, vels):
-                    v.mul_(momentum).add_(p.grad)
-                    p -= cur_lr * v
+                for p in params:
+                    p -= lr * p.grad
             if step < 5 or step % 1000 == 0:
                 print(f"  step {step:5d}  loss {loss.item():.4f}")
             step += 1
