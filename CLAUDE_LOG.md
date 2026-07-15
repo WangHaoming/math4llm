@@ -175,3 +175,10 @@ drawGrid 全部改用 w/h;③sketch.js:按 canvas-holder 实际尺寸建画布,
 - **已用 headless Chrome 验证**:1200×800 与 1680×1000 下画布均与容器
   等大、面板恒 340px;动态改视口画布跟随;resize 后证明演示功能正常
   (乘加 = 转轴前点积 1.00);控制台除既有 favicon 404 无报错。
+
+---
+
+## 2026-07-15 · dot-product:「显示平行四边形 a + b」默认关闭
+
+**改动**:index.html 中 #showSum 复选框去掉 checked 属性,页面打开时默认
+只显示投影,减少初始画面元素;勾选后功能不变。纯 HTML 属性改动,未运行测试。
