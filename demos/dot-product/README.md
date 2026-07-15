@@ -266,8 +266,8 @@ cos 的尺子传给了点积,于是点积的**符号**天生就带含义:
 
 顺带一提两个常用的副产品,后面都会用到:
 
-- **自己点自己 = 长度的平方**:$\mathbf{a} \cdot \mathbf{a} = |\mathbf{a}|^2$(θ=0,cos=1);
-- **从点积反解夹角**:$\cos\theta = \dfrac{\mathbf{a} \cdot \mathbf{b}}{|\mathbf{a}|\,|\mathbf{b}|}$——把长度除掉,
+- **自己点自己 = 长度的平方**: $\mathbf{a} \cdot \mathbf{a} = |\mathbf{a}|^2$(θ=0,cos=1);
+- **从点积反解夹角**: $\cos\theta = \dfrac{\mathbf{a} \cdot \mathbf{b}}{|\mathbf{a}|\,|\mathbf{b}|}$——把长度除掉,
   还原出那把纯粹的方向尺子。这个量有个更响亮的名字:**余弦相似度**。
 
 ---
