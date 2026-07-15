@@ -231,7 +231,7 @@ $$\mathbf{a} \cdot \mathbf{b} = |\mathbf{a}|\cos\theta \cdot |\mathbf{b}| + |\ma
 转轴前后,面板里的点积 a·b **一个数都没变**——这正是下面旁注要说的。
 
 **旁注:转坐标轴,"乘加"的结果不会变吗?** 有此一问,说明你想到了关键处。
-把任意坐标下的 a、b 都写成"长度 ×(cos方位角, sin方位角)"的形式: $\mathbf{a} = |\mathbf{a}|(\cos\alpha,\ \sin\alpha)$,$\mathbf{b} = |\mathbf{b}|(\cos\beta,\ \sin\beta)$,代入乘加规则:
+把任意坐标下的 a、b 都写成"长度 ×(cos方位角, sin方位角)"的形式: $\mathbf{a} = |\mathbf{a}|(\cos\alpha,\ \sin\alpha)$, $\mathbf{b} = |\mathbf{b}|(\cos\beta,\ \sin\beta)$,代入乘加规则:
 
 $$\mathbf{a} \cdot \mathbf{b} = |\mathbf{a}|\,|\mathbf{b}|(\cos\alpha\cos\beta + \sin\alpha\sin\beta) = |\mathbf{a}|\,|\mathbf{b}|\cos(\alpha - \beta)$$
 
