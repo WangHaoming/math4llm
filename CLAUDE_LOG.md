@@ -223,3 +223,19 @@ Unicode 下标/旧写法残留。未运行测试(纯文档改动)。
 
 **补充**:三张图 θ 行末尾的虚线点已按"θ 后不留对齐字符"原则收掉(借虚线断格),
 校验脚本对 dot-product 与 what-is-nn 两个 README 均通过。
+
+---
+
+## 2026-07-15 · dot-product demo:坐标轴加刻度数字
+
+**初始理解**:用户要求画布坐标系标出 x、y 轴刻度。属通用绘图能力,按约定
+加入公共层 MathViz。
+
+**改动计划**:①`shared/math-canvas.js` 新增 `drawTicks()`:x 轴刻度数字标在
+轴下方、y 轴标在轴左侧,每 1 数学单位一个,0 只在原点标一次,颜色用面板
+muted 灰;②`demos/dot-product/sketch.js` 在 drawGrid 后调用;③浏览器截图验证。
+
+**总结**:shared/math-canvas.js 新增 drawTicks()(x 轴数字标轴下、y 轴标轴左,
+每 1 单位一个,0 只标原点,近边缘不画,muted 灰 10px);sketch.js 在 drawGrid
+后调用。已用 headless Chrome 截图验证:两轴 −9…9 刻度清晰、原点 0 正确、
+全屏布局与向量绘制不受影响;控制台除既有 favicon 404 无报错。

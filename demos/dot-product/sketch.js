@@ -41,6 +41,7 @@ function setup() {
 function draw() {
   background(15, 17, 23);
   viz.drawGrid();
+  viz.drawTicks();
 
   const O = createVector(0, 0);
   const aP = viz.handle('a'), bP = viz.handle('b');

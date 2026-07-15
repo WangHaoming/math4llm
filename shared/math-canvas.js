@@ -57,6 +57,31 @@ function MathViz(opts = {}) {
       pop();
     },
 
+    // 坐标轴刻度数字:每 1 个数学单位一个,x 轴标在轴下方、y 轴标在轴左侧,
+    // 0 只在原点标一次;贴近画布边缘的刻度不画,避免被裁掉一半
+    drawTicks(col) {
+      push();
+      noStroke(); fill(col || color(154, 160, 180)); textSize(10);
+      const maxX = Math.ceil(w / 2 / unit), maxY = Math.ceil(h / 2 / unit);
+      textAlign(CENTER, TOP);
+      for (let i = -maxX; i <= maxX; i++) {
+        if (i === 0) continue;
+        const s = this.toScreen(createVector(i * unit, 0));
+        if (s.x < 10 || s.x > w - 10) continue;
+        text(i, s.x, h / 2 + 5);
+      }
+      textAlign(RIGHT, CENTER);
+      for (let j = -maxY; j <= maxY; j++) {
+        if (j === 0) continue;
+        const s = this.toScreen(createVector(0, j * unit));
+        if (s.y < 10 || s.y > h - 10) continue;
+        text(j, w / 2 - 5, s.y);
+      }
+      textAlign(RIGHT, TOP);
+      text('0', w / 2 - 5, h / 2 + 5);
+      pop();
+    },
+
     // 在数学像素位置 v 处画文字标注;dx/dy 为屏幕像素偏移(y 向下)
     label(v, txt, col, dx = 0, dy = 0, sz = 13) {
       const s = this.toScreen(v);
