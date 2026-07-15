@@ -124,8 +124,6 @@ canvas { image-rendering: pixelated; }
 .ptable td { border: 1px solid rgba(48,54,61,.6); padding: 0; width: 40px; height: 22px; text-align: center; white-space: nowrap; }
 .ptable td.head { background: var(--bg); color: var(--dim); font-size: 10px; border-color: var(--border); }
 .ptable.wide td { width: 52px; font-size: 10px; }
-.bias-line { font-size: 15px; margin: 4px 0; }
-.bias-line b { font-family: 'SF Mono', Consolas, monospace; font-size: 20px; color: var(--accent); }
 .btn.small { padding: 3px 12px; font-size: 12px; }
 .lang-btn { position: fixed; top: 14px; right: 16px; z-index: 50; }
 .train-summary { display: none; margin-top: 16px; padding: 12px 16px; border: 1px solid var(--green); border-radius: 8px; color: var(--green); background: rgba(63,185,80,.08); }
@@ -189,7 +187,7 @@ canvas { image-rendering: pixelated; }
     <p data-i18n="s2-p1">这个网络长这样——图片的 196 个格子从左边进去，经过中间一层"打分小组"，右边给 0~9 各打一个分，
        分最高的就是它的答案：</p>
     <div class="diagram-wrap"><canvas id="net-diagram" width="720" height="300"></canvas></div>
-    <p data-i18n="s2-p2">网络里一共有 <b>13,258 个可以拧的"小旋钮"</b>（术语叫参数），旋钮决定每根连线的重要程度。
+    <p data-i18n="s2-p2">网络里一共有 <b>13,184 个可以拧的"小旋钮"</b>（术语叫参数），旋钮决定每根连线的重要程度。
        刚出厂时，每个旋钮都停在随机位置——所以它的回答完全是乱猜的。
        下面 8 道题，看看它现在能对几道（瞎猜平均只能对 1 道左右）：</p>
     <div class="samples" id="samples"></div>
@@ -205,8 +203,6 @@ canvas { image-rendering: pixelated; }
       <div class="lab-title" data-i18n="lab-title">改进实验室：下面几招都能让它学得更好。勾选后训练，成绩自动记入对比表——试试关掉几个再训，看看差多少。（改动开关会自动重新开始）</div>
       <label><input type="checkbox" id="opt-data"><span data-i18n="lab-data"><b>教材翻倍</b> <span class="why">—— 从 6000 张翻倍到 12000 张卡片</span></span></label>
       <label><input type="checkbox" id="opt-data60"><span data-i18n="lab-data60"><b>海量教材（60000 张）</b> <span class="why">—— 一次用上全部 60000 张卡片（首次勾选要加载约 15MB 数据；训练约 20~30 秒，勾选后覆盖"教材翻倍"）</span></span><span class="why" id="data60-status"></span></label>
-      <label><input type="checkbox" id="opt-momentum"><span data-i18n="lab-mom"><b>惯性下坡（动量）</b> <span class="why">—— 连续几步方向一致就越走越快，抵消单批例题的"任性"</span></span></label>
-      <label><input type="checkbox" id="opt-decay"><span data-i18n="lab-decay"><b>先大步后小步</b> <span class="why">—— 刚开始大胆拧，快学完时改成细细微调</span></span></label>
       <label><input type="checkbox" id="opt-aug"><span data-i18n="lab-aug"><b>卡片随机挪一格</b> <span class="why">—— 每次看卡片前随机平移一点，免费变出更多"新写法"</span></span></label>
     </div>
     <div class="train-controls">
@@ -402,14 +398,13 @@ const HIDDEN = 64, OUT = 10;
 const HP = { batch: 32, epochs: 20 };
 const N_TRAIN = MNIST.nTrain, N_TEST = MNIST.nTest;
 
-let model = null;      // {W1, b1, W2, b2} 全部 Float32Array 平铺
-let vel = null;        // 动量的"速度"缓存，与 model 同形状
+let model = null;      // {W1, W2} 全部 Float32Array 平铺
 let rngSeed = 42;
 
 // 本轮训练实际使用的教材（默认 12000 张的子集；海量教材就位后指向全量 60000 张）
 let TX = trainX, TL = trainLabels, TIMG = trainImages;
 
-// 改进实验室：读四个开关，得到本轮训练配置（与 make_dataset.py --check 的 torch 对照一致）
+// 改进实验室：读三个开关，得到本轮训练配置（与 make_dataset.py --check 的 torch 对照一致）
 let cfg = null;
 let TOTAL_STEPS = 0;
 function getConfig() {
@@ -418,15 +413,9 @@ function getConfig() {
     // 海量教材（60000 张，数据就位后生效）优先于教材翻倍（12000 vs 6000）
     nTrain: on('opt-data60') && fullReady ? fullLabels.length
           : on('opt-data') ? N_TRAIN : N_TRAIN / 2,
-    momentum: on('opt-momentum') ? 0.9 : 0,           // 惯性下坡
-    lr: on('opt-momentum') ? 0.05 : 0.2,              // 有惯性时步子要小，否则冲过头
-    decay: on('opt-decay'),                            // 先大步后小步（线性衰减到 10%）
+    lr: 0.2,                                           // 固定步长（纯 SGD）
     aug: on('opt-aug'),                                // 卡片随机挪一格
   };
-}
-function currentLR() {
-  const t = Math.min(1, trainedSteps / TOTAL_STEPS);
-  return cfg.lr * (cfg.decay ? 1 - 0.9 * t : 1);
 }
 
 function initModel(seed) {
@@ -436,24 +425,24 @@ function initModel(seed) {
   const s1 = Math.sqrt(2 / PX), s2 = Math.sqrt(2 / HIDDEN);   // He 初始化
   for (let i = 0; i < W1.length; i++) W1[i] = randn() * s1;
   for (let i = 0; i < W2.length; i++) W2[i] = randn() * s2;
-  return { W1, b1: new Float32Array(HIDDEN), W2, b2: new Float32Array(OUT) };
+  return { W1, W2 };
 }
 
 // 前向：xs 为 B×196 平铺，返回 {h: B×64, probs: B×10}
 function forward(xs, B) {
-  const { W1, b1, W2, b2 } = model;
+  const { W1, W2 } = model;
   const h = new Float32Array(B * HIDDEN);
   const probs = new Float32Array(B * OUT);
   for (let b = 0; b < B; b++) {
     const xo = b * PX, ho = b * HIDDEN, po = b * OUT;
     for (let j = 0; j < HIDDEN; j++) {
-      let z = b1[j];
+      let z = 0;
       for (let i = 0; i < PX; i++) z += xs[xo + i] * W1[i * HIDDEN + j];
       h[ho + j] = USE_RELU && z <= 0 ? 0 : z;          // ReLU（USE_RELU=false 时直接线性输出）
     }
     let maxZ = -Infinity;
     for (let k = 0; k < OUT; k++) {
-      let z = b2[k];
+      let z = 0;
       for (let j = 0; j < HIDDEN; j++) z += h[ho + j] * W2[j * OUT + k];
       probs[po + k] = z;
       if (z > maxZ) maxZ = z;
@@ -467,11 +456,10 @@ function forward(xs, B) {
 
 // 一步训练：前向 + 反向 + 更新，返回本批平均"犯错程度"（交叉熵）
 // 反向传播用 softmax 交叉熵的经典化简：dz2 = (probs - onehot) / B
-// 更新规则带动量：v = momentum·v + 梯度；参数 -= 当前学习率 × v
-// （momentum=0 时退化为普通 SGD，v 就是梯度本身）
+// 更新规则是最朴素的 SGD：参数 -= 学习率 × 梯度
 function trainStep(idxs) {
-  const { W1, b1, W2, b2 } = model;
-  const lr_ = currentLR(), mom = cfg.momentum;
+  const { W1, W2 } = model;
+  const lr_ = cfg.lr;
   const B = idxs.length;
   const xs = new Float32Array(B * PX);
   for (let b = 0; b < B; b++) {
@@ -501,7 +489,7 @@ function trainStep(idxs) {
   }
   loss /= B;
 
-  // 第二层：dW2 = hᵀ·dz2，db2 = Σdz2；并顺手算 dh = dz2·W2ᵀ（要在更新 W2 之前）
+  // 第二层：dW2 = hᵀ·dz2；并顺手算 dh = dz2·W2ᵀ（要在更新 W2 之前）
   const dh = new Float32Array(B * HIDDEN);
   for (let b = 0; b < B; b++) {
     const ho = b * HIDDEN, po = b * OUT;
@@ -516,18 +504,11 @@ function trainStep(idxs) {
     for (let k = 0; k < OUT; k++) {
       let g = 0;
       for (let b = 0; b < B; b++) g += h[b * HIDDEN + j] * dz2[b * OUT + k];
-      const v = vel.W2[j * OUT + k] = mom * vel.W2[j * OUT + k] + g;
-      W2[j * OUT + k] -= lr_ * v;
+      W2[j * OUT + k] -= lr_ * g;
     }
   }
-  for (let k = 0; k < OUT; k++) {
-    let g = 0;
-    for (let b = 0; b < B; b++) g += dz2[b * OUT + k];
-    const v = vel.b2[k] = mom * vel.b2[k] + g;
-    b2[k] -= lr_ * v;
-  }
 
-  // 第一层：dW1 = xᵀ·dh，db1 = Σdh（动量下先累积完整梯度，再统一更新）
+  // 第一层：dW1 = xᵀ·dh
   const dW1 = new Float32Array(PX * HIDDEN);
   for (let b = 0; b < B; b++) {
     const xo = b * PX, ho = b * HIDDEN;
@@ -538,14 +519,7 @@ function trainStep(idxs) {
     }
   }
   for (let i = 0; i < PX * HIDDEN; i++) {
-    const v = vel.W1[i] = mom * vel.W1[i] + dW1[i];
-    W1[i] -= lr_ * v;
-  }
-  for (let j = 0; j < HIDDEN; j++) {
-    let g = 0;
-    for (let b = 0; b < B; b++) g += dh[b * HIDDEN + j];
-    const v = vel.b1[j] = mom * vel.b1[j] + g;
-    b1[j] -= lr_ * v;
+    W1[i] -= lr_ * dW1[i];
   }
   return loss;
 }
@@ -651,7 +625,6 @@ function renderWeightGrid() {
 // Δ 图两种模式：'mag' 幅度（|Δ| 白→橙），'dir' 方向（Δ 红=调大/蓝=调小）
 let deltaMode = 'mag';
 let lastDW1 = null;          // 保存最近一次「学一步」的变化量，切换模式时直接重渲染
-let lastDb1 = null;          // 同一步 b1（起评分）的变化量，供参数检查器显示
 function renderDeltaGrid() {
   if (!lastDW1) return;
   let m = 1e-10;
@@ -676,7 +649,7 @@ const losses = [];   // {step, loss}
 function appendLoss(step, loss) { losses.push({ step, loss }); lastLoss = loss; renderLossStat(); drawLossChart(); }
 
 // 标题旁的实时读数：当前犯错程度 L + 换算成"给正确答案的平均把握" e^−L
-// （物理意义见 basic.md 附录 Q4：L=2.30 即纯瞎猜的 10% 把握，L→0 即把握 →100%）
+// （物理意义见 README.md 附录 Q4：L=2.30 即纯瞎猜的 10% 把握，L→0 即把握 →100%）
 let lastLoss = null;
 function renderLossStat() {
   const el = document.getElementById('stat-loss');
@@ -811,14 +784,7 @@ function secTitle(text) {
   d.textContent = text;
   return d;
 }
-function biasLine(html) {
-  const d = document.createElement('div');
-  d.className = 'bias-line';
-  d.innerHTML = html;
-  return d;
-}
-
-// 点模板热图：该打分小组的 196 个位置旋钮（W1 列）+ 起评分 b1 + 对十个评委的发言权重（W2 行）
+// 点模板热图：该打分小组的 196 个位置旋钮（W1 列）+ 对十个评委的发言权重（W2 行）
 function openNeuronModal(j) {
   const judge = c => EN() ? `Judge ${c}` : `评委 ${c}`;
   showModal(
@@ -827,8 +793,6 @@ function openNeuronModal(j) {
          : '这是训练到当前时刻的快照；训练中数值在变，重新打开即刷新。红=正（有墨迹加分），蓝=负（有墨迹扣分）。', [
     secTitle(EN() ? `196 position knobs (one per 14×14 cell, column ${j} of W1)` : `196 个位置旋钮（对应 14×14 每个格子，W1 第 ${j} 列）`),
     buildValueTable((r, c) => model.W1[(r * S + c) * HIDDEN + j], S, S),
-    secTitle(EN() ? 'Base score (bias b1) — granted before seeing any ink' : '起评分（偏置 b1）——不看任何墨迹、无条件先给的分'),
-    biasLine(`b1[${j}] = <b>${model.b1[j].toFixed(4)}</b>`),
     secTitle(EN() ? `Its say with the ten judges (row ${j} of W2) — how much each digit gains/loses when this crew fires`
                   : `对十个评委的发言权重（W2 第 ${j} 行）——这个小组兴奋时，给各数字加/扣多少分`),
     buildValueTable((r, c) => model.W2[j * OUT + c], 1, OUT, { wide: true, colHead: judge }),
@@ -844,20 +808,16 @@ function openDeltaModal(j) {
          : '正数=旋钮被调大（把这批卡片的形状往模板里刻），负数=被调小（往外铲）。', [
     secTitle(EN() ? `Change of the 196 position knobs (column ${j} of ΔW1)` : `196 个位置旋钮的变化量（ΔW1 第 ${j} 列）`),
     buildValueTable((r, c) => lastDW1[(r * S + c) * HIDDEN + j], S, S),
-    secTitle(EN() ? 'Change of the base score' : '起评分的变化量'),
-    biasLine(`Δb1[${j}] = <b>${lastDb1[j].toFixed(6)}</b>`),
   ]);
 }
 
-// 输出层参数：十个评委的底分 b2 + W2 全表
+// 输出层参数：W2 全表
 function openOutputModal() {
   const judge = c => EN() ? `Judge ${c}` : `评委 ${c}`;
   showModal(
     EN() ? 'All output-layer parameters' : '输出层的全部参数',
-    EN() ? 'Each of the ten judges has a "base score" (granted before any evidence), plus the weighting table used when hearing the 64 crews\' reports (full W2).'
-         : '十个评委各有一个"底分"（不看任何证据先领的分），以及听取 64 个打分小组汇报时的加权表（W2 全表）。', [
-    secTitle(EN() ? 'The ten judges\' base scores (bias b2)' : '十个评委的底分（偏置 b2）'),
-    buildValueTable((r, c) => model.b2[c], 1, OUT, { wide: true, colHead: judge }),
+    EN() ? 'The weighting table used when the ten judges hear the 64 crews\' reports (full W2).'
+         : '十个评委听取 64 个打分小组汇报时的加权表（W2 全表）。', [
     secTitle(EN() ? 'Full W2: 64 scoring crews × 10 judges (rows = crews, numbered like the heatmaps above)'
                   : 'W2 全表：64 个打分小组 × 10 个评委（行 = 小组，与上方热图编号一致）'),
     buildValueTable((r, c) => model.W2[r * OUT + c], HIDDEN, OUT,
@@ -1004,7 +964,7 @@ function nextBatch() {
   return idxs;
 }
 
-// 初始化/重置一轮训练：读开关配置、换新模型、清空动量与进度
+// 初始化/重置一轮训练：读开关配置、换新模型、清空进度
 function initRun() {
   cfg = getConfig();
   const useFull = fullReady && cfg.nTrain > N_TRAIN;
@@ -1013,17 +973,12 @@ function initRun() {
   TIMG = useFull ? fullImages : trainImages;
   TOTAL_STEPS = HP.epochs * Math.floor(cfg.nTrain / HP.batch);
   model = initModel(rngSeed);
-  vel = {
-    W1: new Float32Array(PX * HIDDEN), b1: new Float32Array(HIDDEN),
-    W2: new Float32Array(HIDDEN * OUT), b2: new Float32Array(OUT),
-  };
   trainRng = mulberry32(rngSeed * 1000 + 1);
   epochPerm = null; epochPos = 0;
   trainedSteps = 0;
   losses.length = 0;
   lastLoss = null;
   lastDW1 = null;
-  lastDb1 = null;
 }
 
 function updateStats(acc) {
@@ -1047,7 +1002,6 @@ function renderStepGuess() {
 function stepOnce() {
   const idxs = nextBatch();
   const before = model.W1.slice();          // 拍一张"拧之前"的旋钮照片
-  const b1Before = model.b1.slice();
   const first = idxs[0];
   const { pred } = predictOne(TX.subarray(first * PX, (first + 1) * PX));  // 训练前的猜测
   const loss = trainStep(idxs);
@@ -1055,8 +1009,6 @@ function stepOnce() {
 
   lastDW1 = new Float32Array(before.length);
   for (let i = 0; i < before.length; i++) lastDW1[i] = model.W1[i] - before[i];
-  lastDb1 = new Float32Array(HIDDEN);
-  for (let j = 0; j < HIDDEN; j++) lastDb1[j] = model.b1[j] - b1Before[j];
 
   document.getElementById('stepbox').classList.add('show');
   renderDigit(document.getElementById('step-digit'), TIMG.subarray(first * PX, (first + 1) * PX), false);
@@ -1090,15 +1042,15 @@ function renderRunsTable() {
   const bestAcc = Math.max(...runHistory.map(r => r.acc));
   const mark = v => v ? '✓' : '—';
   tbl.innerHTML = (EN()
-    ? '<tr><th>Run</th><th>Cards</th><th>Momentum</th><th>Step decay</th><th>Random nudge</th><th>Exam score</th></tr>'
-    : '<tr><th>轮次</th><th>教材（张）</th><th>惯性下坡</th><th>先大步后小步</th><th>随机挪一格</th><th>考试成绩</th></tr>') +
+    ? '<tr><th>Run</th><th>Cards</th><th>Random nudge</th><th>Exam score</th></tr>'
+    : '<tr><th>轮次</th><th>教材（张）</th><th>随机挪一格</th><th>考试成绩</th></tr>') +
     runHistory.map((r, i) =>
       `<tr class="${r.acc === bestAcc ? 'best' : ''}"><td>${i + 1}</td><td>${r.nTrain.toLocaleString()}</td>` +
-      `<td>${mark(r.momentum)}</td><td>${mark(r.decay)}</td><td>${mark(r.aug)}</td>` +
+      `<td>${mark(r.aug)}</td>` +
       `<td class="acc">${(r.acc * 100).toFixed(1)}%</td></tr>`).join('');
 }
 function setLabEnabled(on) {
-  for (const id of ['opt-data', 'opt-data60', 'opt-momentum', 'opt-decay', 'opt-aug'])
+  for (const id of ['opt-data', 'opt-data60', 'opt-aug'])
     document.getElementById(id).disabled = !on;
 }
 
@@ -1138,8 +1090,7 @@ function startTraining() {
       renderWeightGrid();
       renderSamplePredictions();
       training = false;
-      runHistory.push({ nTrain: cfg.nTrain, momentum: cfg.momentum > 0,
-        decay: cfg.decay, aug: cfg.aug, acc });
+      runHistory.push({ nTrain: cfg.nTrain, aug: cfg.aug, acc });
       renderRunsTable();
       doneAcc = acc;
       const btn = document.getElementById('btn-train');
@@ -1375,14 +1326,12 @@ const I18N_EN = {
   's1-note': 'Note: the machine doesn’t see a “picture” — it sees 14×14 = 196 numbers describing brightness. It can only do arithmetic; it cannot “look”.',
   's2-title': 'Before training: it can only guess',
   's2-p1': 'Here is the network — the picture’s 196 cells enter on the left, pass through a middle layer of “scoring crews”, and each digit 0–9 gets a score on the right; the highest score is its answer:',
-  's2-p2': 'The network has <b>13,258 tiny adjustable “knobs”</b> (the term is parameters); they decide how much each connection matters. Fresh out of the box every knob sits at a random position — so its answers are pure guesses. Here are 8 questions; see how many it gets right now (random guessing averages about 1):',
+  's2-p2': 'The network has <b>13,184 tiny adjustable “knobs”</b> (the term is parameters); they decide how much each connection matters. Fresh out of the box every knob sits at a random position — so its answers are pure guesses. Here are 8 questions; see how many it gets right now (random guessing averages about 1):',
   's3-title': 'Learning: one batch of flashcards at a time',
   's3-p': 'How the machine “grinds exercises”: take 32 flashcards, guess, then check the answers; for every mistake, nudge the responsible knobs <b>a tiny bit</b> in the right direction. Click “One step” to watch a single step up close, or “Start learning” to fast-forward.',
   'lab-title': 'Improvement lab: each trick below helps it learn better. Tick some and train — the score is logged in the comparison table, so try switching them on and off to see the difference. (Changing a switch restarts training.)',
   'lab-data': '<b>Double the textbook</b> <span class="why">— from 6,000 to 12,000 flashcards</span>',
   'lab-data60': '<b>The whole textbook (60,000 cards)</b> <span class="why">— use every MNIST training card at once (first tick downloads ~15MB; training takes 20–30s; overrides “Double the textbook”)</span>',
-  'lab-mom': '<b>Momentum</b> <span class="why">— keep rolling when several steps agree, cancelling each batch’s whims</span>',
-  'lab-decay': '<b>Big steps, then small steps</b> <span class="why">— twist boldly at first, fine-tune near the end</span>',
   'lab-aug': '<b>Nudge cards randomly</b> <span class="why">— shift each card ±1 pixel before showing it: free “new handwriting”</span>',
   'btn-step': '👣 One step',
   'btn-reset': '🔄 Start over',
@@ -1459,7 +1408,7 @@ document.getElementById('delta-mode-mag').addEventListener('click', () => setDel
 document.getElementById('delta-mode-dir').addEventListener('click', () => setDeltaMode('dir'));
 document.getElementById('btn-output-params').addEventListener('click', openOutputModal);
 document.getElementById('hidden-map').addEventListener('click', openHiddenModal);
-for (const id of ['opt-data', 'opt-momentum', 'opt-decay', 'opt-aug'])
+for (const id of ['opt-data', 'opt-aug'])
   document.getElementById(id).addEventListener('change', resetAll);   // 改开关 = 重新开始
 document.getElementById('opt-data60').addEventListener('change', () => {
   if (document.getElementById('opt-data60').checked && !fullReady) ensureFullData();
