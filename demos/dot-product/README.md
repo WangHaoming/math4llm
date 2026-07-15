@@ -5,7 +5,7 @@
 
 ## 如何使用
 
-1. 打开本目录的 `index.html`(或从合集首页进入)。
+1. 打开本目录的 [index.html](https://wanghaoming.github.io/math4llm/demos/dot-product/index.html)(或从合集[首页](https://wanghaoming.github.io/math4llm/)进入)。
 2. 画布上有两个箭头:**a**(红) 和 **b**(蓝)。
 3. **拖动箭头端点**改变向量;右侧面板实时显示坐标、点积、夹角、投影。
 4. 三个开关:
