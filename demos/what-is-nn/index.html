@@ -393,6 +393,11 @@ function makeRandn(rng) {
 }
 
 // ── 模型：196 → 64(ReLU) → 10(softmax) ───────────────────────────────────────
+// 消融实验开关：改成 false 则隐藏层不做 ReLU（退化为纯线性网络），
+// 训练与推理同时生效，用于对比激活函数对准确率的影响。不在 UI 上暴露。
+//const USE_RELU = false;
+
+const USE_RELU = true;
 const HIDDEN = 64, OUT = 10;
 const HP = { batch: 32, epochs: 20 };
 const N_TRAIN = MNIST.nTrain, N_TEST = MNIST.nTest;
@@ -444,7 +449,7 @@ function forward(xs, B) {
     for (let j = 0; j < HIDDEN; j++) {
       let z = b1[j];
       for (let i = 0; i < PX; i++) z += xs[xo + i] * W1[i * HIDDEN + j];
-      h[ho + j] = z > 0 ? z : 0;                       // ReLU
+      h[ho + j] = USE_RELU && z <= 0 ? 0 : z;          // ReLU（USE_RELU=false 时直接线性输出）
     }
     let maxZ = -Infinity;
     for (let k = 0; k < OUT; k++) {
@@ -501,7 +506,7 @@ function trainStep(idxs) {
   for (let b = 0; b < B; b++) {
     const ho = b * HIDDEN, po = b * OUT;
     for (let j = 0; j < HIDDEN; j++) {
-      if (h[ho + j] <= 0) continue;                     // ReLU 掩码：没被激活的不传梯度
+      if (USE_RELU && h[ho + j] <= 0) continue;         // ReLU 掩码：没被激活的不传梯度（线性模式不掩码）
       let g = 0;
       for (let k = 0; k < OUT; k++) g += dz2[po + k] * W2[j * OUT + k];
       dh[ho + j] = g;

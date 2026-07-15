@@ -37,6 +37,18 @@
 
       <label><input type="checkbox" id="showProj" checked /> 显示投影(点积的几何意义)</label>
       <label><input type="checkbox" id="showSum" checked /> 显示平行四边形 a + b</label>
+      <label><input type="checkbox" id="showProof" /> 证明演示:把 b 转到 x 轴上</label>
+
+      <div id="proof-box" style="display:none">
+        <div class="row"><span class="k b">躺平后 b</span><span class="val b" id="pfB">—</span></div>
+        <div class="row"><span class="k a">此时 a</span><span class="val a" id="pfA">—</span></div>
+        <div class="row"><span class="k">乘加</span><span class="val" id="pfCalc">—</span></div>
+        <div class="row"><span class="k"></span><span class="val" id="pfRes">—</span></div>
+        <div class="hint">
+          整体旋转,长度和夹角都没变;a 的横坐标就是影子 |a|cosθ,
+          纵坐标 |a|sinθ 乘上 b 的 0 被丢弃 —— 点积只认影子。
+        </div>
+      </div>
 
       <div class="hint">
         点积 = |b| × (a 投影到 b 的长度)。<br>

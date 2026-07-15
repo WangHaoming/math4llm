@@ -8,7 +8,8 @@
 // 用法见 demos/dot-product/sketch.js。
 
 function MathViz(opts = {}) {
-  const size = opts.size || 560;       // 画布边长(像素)
+  let w = opts.w || opts.size || 560;  // 画布宽(像素;不传 w/h 则沿用 size 正方形)
+  let h = opts.h || opts.size || 560;  // 画布高(像素)
   const unit = opts.unit || 40;        // 1 个数学单位 = 多少像素
   const snap = opts.snap || unit / 2;  // 拖拽吸附步长
 
@@ -16,13 +17,18 @@ function MathViz(opts = {}) {
   let dragging = null;
 
   const api = {
-    size, unit,
+    unit,
+    get w() { return w; },
+    get h() { return h; },
+
+    // 画布尺寸变化时调用;端点以数学像素相对原点存储,原点始终居中,位置自动保持
+    resize(nw, nh) { w = nw; h = nh; },
 
     // ---- 坐标变换 ----
     // 数学像素(y 向上,原点中心) -> 屏幕像素(y 向下,原点左上)
-    toScreen(v) { return createVector(size / 2 + v.x, size / 2 - v.y); },
+    toScreen(v) { return createVector(w / 2 + v.x, h / 2 - v.y); },
     // 屏幕像素 -> 数学像素
-    toLocal(sx, sy) { return createVector(sx - size / 2, -(sy - size / 2)); },
+    toLocal(sx, sy) { return createVector(sx - w / 2, -(sy - h / 2)); },
     // 数学像素 -> 数学单位 (x, y)
     toUnits(v) { return createVector(v.x / unit, v.y / unit); },
     // 数学单位 -> 数学像素
@@ -32,11 +38,11 @@ function MathViz(opts = {}) {
     drawGrid() {
       push();
       stroke(40, 44, 60); strokeWeight(1);
-      for (let x = (size / 2) % unit; x < size; x += unit) line(x, 0, x, size);
-      for (let y = (size / 2) % unit; y < size; y += unit) line(0, y, size, y);
+      for (let x = (w / 2) % unit; x < w; x += unit) line(x, 0, x, h);
+      for (let y = (h / 2) % unit; y < h; y += unit) line(0, y, w, y);
       stroke(90, 96, 120); strokeWeight(1.5);
-      line(0, size / 2, size, size / 2);   // x 轴
-      line(size / 2, 0, size / 2, size);   // y 轴
+      line(0, h / 2, w, h / 2);   // x 轴
+      line(w / 2, 0, w / 2, h);   // y 轴
       pop();
     },
 
@@ -48,6 +54,14 @@ function MathViz(opts = {}) {
       const ang = atan2(e.y - s.y, e.x - s.x);
       translate(e.x, e.y); rotate(ang);
       noStroke(); triangle(0, 0, -12, 5, -12, -5);
+      pop();
+    },
+
+    // 在数学像素位置 v 处画文字标注;dx/dy 为屏幕像素偏移(y 向下)
+    label(v, txt, col, dx = 0, dy = 0, sz = 13) {
+      const s = this.toScreen(v);
+      push(); noStroke(); fill(col); textSize(sz); textAlign(CENTER, CENTER);
+      text(txt, s.x + dx, s.y + dy);
       pop();
     },
 
