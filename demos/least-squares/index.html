@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>回归 · 最小二乘法</title>
+  <link rel="stylesheet" href="../../shared/style.css" />
+
+  <!-- 第三方库:p5.js + KaTeX(CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+  <!-- 项目公共层 -->
+  <script src="../../shared/math-canvas.js"></script>
+  <script src="../../shared/katex-setup.js"></script>
+</head>
+<body>
+  <main class="demo">
+    <div class="canvas-holder" id="canvas-holder"></div>
+
+    <section class="panel">
+      <a class="back" href="../../index.html">← 返回合集</a>
+      <h1>回归 · 最小二乘法</h1>
+      <div class="sub">拖 <span class="a">●</span> 散点与 <span class="b">●</span> 直线端点;点空白处加点,双击散点删除</div>
+
+      <div class="row"><span class="k b">当前直线 k(斜率)</span><span class="val b" id="k">0</span></div>
+      <div class="row"><span class="k b">当前直线 b(截距)</span><span class="val b" id="vb">0</span></div>
+      <div class="row"><span class="k proj">残差平方和 SSE</span><span class="val proj" id="sse">0</span></div>
+
+      <div class="formula">$$ \min_{k,\,b}\ \sum_i \big(y_i - k x_i - b\big)^2 $$</div>
+
+      <div class="row"><span class="k sum">最优 k*</span><span class="val sum" id="kbest">—</span></div>
+      <div class="row"><span class="k sum">最优 b*</span><span class="val sum" id="bbest">—</span></div>
+      <div class="row"><span class="k sum">最小 SSE</span><span class="val sum" id="ssebest">—</span></div>
+
+      <label><input type="checkbox" id="showResid" checked /> 显示残差(点到直线的竖直虚线)</label>
+      <label><input type="checkbox" id="showSquares" checked /> 显示残差的平方(黄色正方形)</label>
+      <label><input type="checkbox" id="showBest" /> 显示最佳拟合参考线(绿色)</label>
+
+      <button id="btn-fit">一键拟合:梯度下降"下山"</button>
+      <button id="btn-reset" class="secondary">重置数据</button>
+
+      <div class="hint">
+        黄色正方形的面积 = 每个点残差的平方,SSE 就是它们的总面积。<br>
+        手动拖直线让 SSE 变小,再按「一键拟合」看梯度下降滚到谷底。
+      </div>
+    </section>
+  </main>
+
+  <script src="sketch.js"></script>
+</body>
+</html>

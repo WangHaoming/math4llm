@@ -108,6 +108,8 @@ function MathViz(opts = {}) {
     },
     handle(name) { return handles[name].pos; },   // 数学像素
     units(name) { return this.toUnits(handles[name].pos); }, // 数学单位 (x,y)
+    removeHandle(name) { if (dragging === name) dragging = null; delete handles[name]; },
+    isDragging() { return dragging !== null; },   // 本次按下是否抓中了某个端点
 
     drawHandles() {
       for (const k in handles) {

@@ -10,7 +10,7 @@
 
 已规划/进行中的 demo:
 - ✅ 向量加法 · 点积(`demos/dot-product/`)
-- ⏳ 最小二乘法
+- ✅ 回归 · 最小二乘法(`demos/least-squares/`)
 - ⏳ 微分 · 导数
 - (后续持续增加)
 
