@@ -74,6 +74,8 @@ body {
   padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 12px;
 }
 .panel button:hover { filter: brightness(1.12); }
+.panel button:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.panel button:disabled:hover { filter: none; }
 .panel button.secondary { background: transparent; color: var(--muted); border: 1px solid var(--border); }
 .panel button.secondary:hover { color: var(--ink); border-color: var(--accent); filter: none; }
 /* 与拟合线同色的按钮:绿=最小二乘 L2,紫=绝对值 L1 */
