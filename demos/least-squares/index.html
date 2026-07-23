@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>回归 · 最小二乘法</title>
+  <title>回归 · 最小二乘 vs 最小绝对偏差</title>
   <link rel="stylesheet" href="../../shared/style.css" />
 
   <!-- 第三方库:p5.js + KaTeX(CDN) -->
@@ -22,29 +22,47 @@
 
     <section class="panel">
       <a class="back" href="../../index.html">← 返回合集</a>
-      <h1>回归 · 最小二乘法</h1>
+      <h1>回归 · 最小二乘 vs 最小绝对偏差</h1>
       <div class="sub">拖 <span class="a">●</span> 散点与 <span class="b">●</span> 直线端点;点空白处加点,双击散点删除</div>
 
       <div class="row"><span class="k b">当前直线 k(斜率)</span><span class="val b" id="k">0</span></div>
       <div class="row"><span class="k b">当前直线 b(截距)</span><span class="val b" id="vb">0</span></div>
       <div class="row"><span class="k proj">残差平方和 SSE</span><span class="val proj" id="sse">0</span></div>
+      <div class="row"><span class="k lad">残差绝对值和 SAE</span><span class="val lad" id="vsae">0</span></div>
 
-      <div class="formula">$$ \min_{k,\,b}\ \sum_i \big(y_i - k x_i - b\big)^2 $$</div>
+      <div class="formula">
+        $$ \text{L2:}\ \min_{k,\,b}\ \sum_i \big(y_i - k x_i - b\big)^2 $$
+        $$ \text{L1:}\ \min_{k,\,b}\ \sum_i \big|\,y_i - k x_i - b\,\big| $$
+      </div>
 
-      <div class="row"><span class="k sum">最优 k*</span><span class="val sum" id="kbest">—</span></div>
-      <div class="row"><span class="k sum">最优 b*</span><span class="val sum" id="bbest">—</span></div>
+      <div class="row"><span class="k sum">最小二乘 L2 · k*</span><span class="val sum" id="kbest">—</span></div>
+      <div class="row"><span class="k sum">最小二乘 L2 · b*</span><span class="val sum" id="bbest">—</span></div>
       <div class="row"><span class="k sum">最小 SSE</span><span class="val sum" id="ssebest">—</span></div>
 
-      <label><input type="checkbox" id="showResid" checked /> 显示残差(点到直线的竖直虚线)</label>
-      <label><input type="checkbox" id="showSquares" checked /> 显示残差的平方(黄色正方形)</label>
-      <label><input type="checkbox" id="showBest" /> 显示最佳拟合参考线(绿色)</label>
+      <div class="row"><span class="k lad">最小绝对偏差 L1 · k</span><span class="val lad" id="kbestL1">—</span></div>
+      <div class="row"><span class="k lad">最小绝对偏差 L1 · b</span><span class="val lad" id="bbestL1">—</span></div>
+      <div class="row"><span class="k lad">最小 SAE</span><span class="val lad" id="saebest">—</span></div>
 
-      <button id="btn-fit">一键拟合:梯度下降"下山"</button>
+      <label><input type="checkbox" id="showResid" checked /> 显示残差竖线(长度=误差,总长=SAE)</label>
+      <label><input type="checkbox" id="showSquares" checked /> 显示残差的平方(黄色正方形,总面积=SSE)</label>
+      <label><input type="checkbox" id="showBest" checked /> 显示 L2 最小二乘线(绿色)</label>
+      <label><input type="checkbox" id="showBestL1" checked /> 显示 L1 最小绝对偏差线(紫色)</label>
+
+      <div class="steplog">
+        <div class="sl-head">试探法(每点一次,朝四个方向试探一步)</div>
+        <div class="sl-body" id="steplog-body">还没开始 —— 点下方按钮,让蓝线凭感觉试探一步。</div>
+      </div>
+
+      <button id="btn-fit-l2" class="acc-sum">L2 · 最小二乘试探一步</button>
+      <button id="btn-fit-l1" class="acc-lad">L1 · 绝对值误差试探一步</button>
       <button id="btn-reset" class="secondary">重置数据</button>
 
       <div class="hint">
-        黄色正方形的面积 = 每个点残差的平方,SSE 就是它们的总面积。<br>
-        手动拖直线让 SSE 变小,再按「一键拟合」看梯度下降滚到谷底。
+        蓝线 = 你正在拟合的直线。反复点某个按钮,它就"凭感觉"把直线朝四个方向
+        各试一点、留下误差最小的,一步步逼近绿线(L2)或紫线(L1)。<br>
+        这是不用导数的笨办法(下一节讲导数后,会用梯度下降取代它)。
+        把某个红点拖到很远:绿线被离群点狠狠拽走,紫线几乎不动——
+        这就是绝对值损失更"抗噪"的直观来源。
       </div>
     </section>
   </main>

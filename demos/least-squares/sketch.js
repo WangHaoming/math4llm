@@ -1,13 +1,25 @@
 // demos/least-squares/sketch.js
-// 最小二乘法:拖动散点与直线,实时看残差平方和 SSE;
-// 「一键拟合」对 (k, b) 做梯度下降动画,亲眼看 SSE 滚到谷底。
+// 最小二乘法:拖动散点与直线,实时看残差平方和 SSE 与残差绝对值和 SAE;
+// 同屏对比两条最优线——绿色 L2(平方误差,闭式解)与紫色 L1(绝对值误差,
+// 暴力精确解)。两个「迈一步」按钮用**试探法(爬山)**逐步拟合:每步把直线朝
+// 四个方向各试探一点、保留误差最小的那个,卡住就把试探步长减半——只需会算
+// 误差、会比大小,完全不碰导数(导数与梯度下降留到下一节)。
 
 let viz;
 const COL = {};
 let ptNames = [];          // 散点手柄名列表
 let nextId = 0;
 let k = 0, b = 0;          // 当前直线参数(数学单位)
-let fitting = false;       // 梯度下降动画进行中
+
+// 逐步拟合状态:当前用哪种方法、已走几步、最近一步的详细信息
+let stepMethod = null;     // 'L2' | 'L1' | null
+let stepCount = 0;         // 当前连续拟合累计步数
+let stepInfo = null;       // 最近一步的详细数据(供面板显示)
+let probeK = 0, probeB = 0;// 试探步长(斜率方向 / 截距方向),随卡壳逐步减半
+
+const PROBE_K0 = 0.20;     // 斜率初始试探步长
+const PROBE_B0 = 0.30;     // 截距初始试探步长
+const PROBE_GROW = 1.3;    // 试探成功时把该方向步长放大(加速),否则原地减半
 
 // 初始散点:大致沿 y = 0.5x + 1 加噪声;初始直线故意放偏
 const INIT_PTS = [[-6, -2], [-4.5, -1.5], [-3, 0], [-1.5, -0.5], [0, 1.5], [2, 1.5], [3.5, 3.5], [5, 3]];
@@ -27,7 +39,8 @@ function setup() {
 
   COL.pt = color(255, 107, 107);      // 散点(红)
   COL.line = color(77, 171, 247);     // 当前直线(蓝)
-  COL.best = color(81, 207, 102);     // 最佳拟合参考线(绿)
+  COL.best = color(81, 207, 102);     // L2 最小二乘参考线(绿)
+  COL.bestL1 = color(177, 151, 252);  // L1 最小绝对偏差参考线(紫)
   COL.sq = color(255, 212, 59);       // 残差平方(黄)
   COL.white = color(255);
 
@@ -39,7 +52,8 @@ function setup() {
     if (s.w !== width || s.h !== height) { resizeCanvas(s.w, s.h); viz.resize(s.w, s.h); }
   }).observe(document.getElementById('canvas-holder'));
 
-  document.getElementById('btn-fit').addEventListener('click', () => { fitting = true; });
+  document.getElementById('btn-fit-l2').addEventListener('click', () => doStep('L2'));
+  document.getElementById('btn-fit-l1').addEventListener('click', () => doStep('L1'));
   document.getElementById('btn-reset').addEventListener('click', resetData);
 
   KatexSetup();
@@ -47,7 +61,7 @@ function setup() {
 
 // 重建 MathViz 与所有端点,恢复初始散点和直线
 function resetData() {
-  fitting = false;
+  resetStep();
   viz = MathViz({ w: width, h: height, unit: 40 });
   ptNames = []; nextId = 0;
   for (const [x, y] of INIT_PTS) addPoint(x, y);
@@ -69,24 +83,19 @@ function draw() {
 
   const pts = ptNames.map(n => viz.units(n));
   const best = bestFit(pts);
+  const bestL1 = bestFitL1(pts);
 
-  if (fitting) {
-    gdStep(pts);                       // 每帧一步梯度下降
-    syncLineHandles();
-    if (best && Math.abs(k - best.k) < 1e-4 && Math.abs(b - best.b) < 1e-4) fitting = false;
-    if (!best) fitting = false;
-  } else {
-    deriveLineFromHandles();
-  }
+  deriveLineFromHandles();             // 蓝线始终由两个端点决定;拟合一步后端点已同步
 
   if (checked('showBest') && best) drawFullLine(best.k, best.b, COL.best, true);
+  if (checked('showBestL1') && bestL1) drawFullLine(bestL1.k, bestL1.b, COL.bestL1, true);
   drawFullLine(k, b, COL.line, false);
 
   if (checked('showSquares')) for (const p of pts) drawSquare(p);
   if (checked('showResid')) for (const p of pts) drawResid(p);
 
   viz.drawHandles();
-  updatePanel(pts, best);
+  updatePanel(pts, best, bestL1);
 }
 
 // 由 L1/L2 两个端点派生 k、b(两点几乎垂直对齐时保持原值,避免斜率爆炸)
@@ -97,7 +106,7 @@ function deriveLineFromHandles() {
   b = p1.y - k * p1.x;
 }
 
-// 拟合动画期间让 L1/L2 贴在当前直线上(保持各自 x 不变)
+// 拟合走完一步后,让 L1/L2 两个端点贴回新直线上(保持各自 x 不变)
 function syncLineHandles() {
   for (const name of ['L1', 'L2']) {
     const pos = viz.handle(name);
@@ -125,29 +134,87 @@ function sse(pts, k_, b_) {
   return s;
 }
 
-// 梯度下降一步。用"过均值点"的参数化 yhat = k·(x−x̄) + c(c 与 k 解耦,
-// 下山不绕弯),步长按曲率归一,每步把与谷底的距离缩到约 90%
-function gdStep(pts) {
-  const n = pts.length;
-  if (n < 2) { fitting = false; return; }
-  let mx = 0, my = 0;
-  for (const p of pts) { mx += p.x; my += p.y; }
-  mx /= n; my /= n;
-  let vxx = 0;
-  for (const p of pts) vxx += (p.x - mx) * (p.x - mx);
-  vxx /= n;
-  if (vxx < 1e-9) { fitting = false; return; }
+// 残差绝对值和 SAE = Σ|yᵢ − (k·xᵢ + b)|(= 画布上所有残差竖线的总长度)
+function sae(pts, k_, b_) {
+  let s = 0;
+  for (const p of pts) s += Math.abs(p.y - (k_ * p.x + b_));
+  return s;
+}
 
-  let c = k * mx + b;
-  let dk = 0, dc = 0;
-  for (const p of pts) {
-    const e = p.y - (k * (p.x - mx) + c);
-    dk += -2 * e * (p.x - mx) / n;
-    dc += -2 * e / n;
+// 最小绝对偏差(LAD / L1)最优直线:目标 min Σ|eᵢ| 没有闭式解(本质是线性规划),
+// 但有个漂亮性质——最优线一定恰好穿过其中至少两个数据点。于是枚举所有点对
+// (n≤15,最多 105 对)确定候选 (k, b),取 SAE 最小者即精确解。x 相同的点对
+// 对应竖线(斜率无穷),跳过。全部点 x 相同时无解,返回 null(面板显示"—")。
+function bestFitL1(pts) {
+  const n = pts.length;
+  if (n < 2) return null;
+  let best = null;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const dx = pts[j].x - pts[i].x;
+      if (Math.abs(dx) < 1e-9) continue;
+      const kk = (pts[j].y - pts[i].y) / dx;
+      const bb = pts[i].y - kk * pts[i].x;
+      const s = sae(pts, kk, bb);
+      if (!best || s < best.sae) best = { k: kk, b: bb, sae: s };
+    }
   }
-  k -= (0.05 / vxx) * dk;
-  c -= 0.05 * dc;
-  b = c - k * mx;
+  return best;
+}
+
+// ---- 逐步拟合:两个「迈一步」按钮各调用一次,都走「试探法」 ----
+
+// 清空拟合进度(重置数据、拖动手柄、增删点后调用),试探步长恢复初值
+function resetStep() {
+  stepMethod = null; stepCount = 0; stepInfo = null;
+  probeK = PROBE_K0; probeB = PROBE_B0;
+}
+
+// 按钮入口:让蓝线朝 method 的目标(L2→SSE,L1→SAE)试探一步,并记录细节
+function doStep(method) {
+  const pts = ptNames.map(n => viz.units(n));
+  if (pts.length < 2) { stepInfo = { err: '至少要有 2 个点才能拟合' }; return; }
+  deriveLineFromHandles();                       // 以手柄当前位置为这一步的起点
+  if (stepMethod !== method) { stepCount = 0; probeK = PROBE_K0; probeB = PROBE_B0; }
+  stepMethod = method;
+  const objFn = method === 'L2' ? sse : sae;      // 目标误差:平方和 / 绝对值和
+  const info = hillStep(pts, objFn, method);
+  syncLineHandles();                              // 端点贴回新直线,draw 里派生出的就是它
+  stepCount++;
+  info.n = stepCount;
+  stepInfo = info;
+}
+
+// 试探法(爬山)一步:把直线朝四个方向各试探一点——斜率 k 加/减 probeK、
+// 截距 b 加/减 probeB,分别算目标误差,保留最小的那个方向;若四个方向都没让误差
+// 变小(卡在谷底附近),就原地把两个试探步长各减半,下一次试得更精细。
+// 全程只用到"算误差"与"比大小",不涉及任何导数。
+function hillStep(pts, objFn, method) {
+  const k0 = k, b0 = b, E0 = objFn(pts, k, b);
+  const cand = [
+    { tag: 'k−', k: k - probeK, b: b },
+    { tag: 'k+', k: k + probeK, b: b },
+    { tag: 'b−', k: k, b: b - probeB },
+    { tag: 'b+', k: k, b: b + probeB },
+  ];
+  for (const c of cand) c.E = objFn(pts, c.k, c.b);
+  const trials = { km: cand[0].E, kp: cand[1].E, bm: cand[2].E, bp: cand[3].E };
+  let best = cand[0];
+  for (const c of cand) if (c.E < best.E) best = c;
+
+  let chosen, shrunk = false;
+  if (best.E < E0 - 1e-12) {                       // 有更好的方向:挪过去,并给该方向加速
+    k = best.k; b = best.b; chosen = best.tag;
+    if (best.tag === 'k−' || best.tag === 'k+') probeK *= PROBE_GROW; else probeB *= PROBE_GROW;
+  } else {                                          // 四个方向都没更好:原地把试探步长减半
+    chosen = 'none'; shrunk = true;
+    probeK *= 0.5; probeB *= 0.5;
+  }
+  return {
+    method, k0, b0, k1: k, b1: b, obj0: E0, obj1: objFn(pts, k, b),
+    objName: method === 'L2' ? 'SSE' : 'SAE',
+    trials, chosen, shrunk, probeK, probeB,
+  };
 }
 
 // 画一条横贯画布的直线(数学单位下的 y = k·x + b)
@@ -180,28 +247,77 @@ function drawSquare(p) {
   pop();
 }
 
-function updatePanel(pts, best) {
+function updatePanel(pts, best, bestL1) {
   set('k', k.toFixed(2));
   set('vb', b.toFixed(2));
   set('sse', sse(pts, k, b).toFixed(2));
+  set('vsae', sae(pts, k, b).toFixed(2));
   set('kbest', best ? best.k.toFixed(2) : '—');
   set('bbest', best ? best.b.toFixed(2) : '—');
   set('ssebest', best ? best.sse.toFixed(2) : '—');
+  set('kbestL1', bestL1 ? bestL1.k.toFixed(2) : '—');
+  set('bbestL1', bestL1 ? bestL1.b.toFixed(2) : '—');
+  set('saebest', bestL1 ? bestL1.sae.toFixed(2) : '—');
+  renderStepLog(best, bestL1);
+}
+
+// 把最近一步的详细信息渲染到面板的「拟合步骤」区
+function renderStepLog(best, bestL1) {
+  const el = document.getElementById('steplog-body');
+  const s = stepInfo;
+  if (!s) { el.innerHTML = '还没开始 —— 点下方按钮,让蓝线朝目标迈一步。'; return; }
+  if (s.err) { el.innerHTML = `<span class="sl-warn">${s.err}</span>`; return; }
+
+  const dk = s.k1 - s.k0, db = s.b1 - s.b0;
+  const stepLen = Math.hypot(dk, db);
+  const dObj = s.obj0 - s.obj1;                       // 正 = 误差下降
+  const pct = s.obj0 > 1e-9 ? Math.abs(dObj) / s.obj0 * 100 : 0;
+  const arrow = dObj >= 0 ? '↓' : '↑', word = dObj >= 0 ? '降' : '增';
+  const on = s.method === 'L2';
+  const opt = on ? best : bestL1;
+  const t = s.trials;
+  // 命中方向标绿,其余灰;卡壳(chosen='none')则全灰
+  const mark = tag => (s.chosen === tag ? 'sl-hit' : 'sl-mut');
+
+  let h = '';
+  h += `<div class="sl-h ${on ? 'sum' : 'lad'}">${on ? '最小二乘 L2' : '最小绝对偏差 L1'} · 试探法 —— 第 ${s.n} 步</div>`;
+  h += `<div class="sl-mut">朝四个方向各试探一点,看 ${s.objName} 谁最小(当前 ${s.obj0.toFixed(2)}):</div>`;
+  h += `<div>斜率 <span class="${mark('k−')}">k−:${t.km.toFixed(2)}</span> · <span class="${mark('k+')}">k+:${t.kp.toFixed(2)}</span></div>`;
+  h += `<div>截距 <span class="${mark('b−')}">b−:${t.bm.toFixed(2)}</span> · <span class="${mark('b+')}">b+:${t.bp.toFixed(2)}</span></div>`;
+  if (s.chosen === 'none') {
+    h += `<div class="sl-warn">四个方向都没更好 → 试探步长减半,试得更细</div>`;
+  } else {
+    h += `<div>最好的是 <b>${s.chosen}</b>,采用</div>`;
+  }
+  h += `<div class="sl-sep"></div>`;
+  h += `<div>k: ${s.k0.toFixed(3)} → <b>${s.k1.toFixed(3)}</b> <span class="sl-mut">(Δk ${signed(dk)})</span></div>`;
+  h += `<div>b: ${s.b0.toFixed(3)} → <b>${s.b1.toFixed(3)}</b> <span class="sl-mut">(Δb ${signed(db)})</span></div>`;
+  h += `<div>走了多大步 |Δ(k,b)| = <b>${stepLen.toFixed(4)}</b></div>`;
+  h += `<div class="sl-mut">当前试探步长 δk=${s.probeK.toFixed(3)}, δb=${s.probeB.toFixed(3)}</div>`;
+  h += `<div class="sl-sep"></div>`;
+  h += `<div>${s.objName}: ${s.obj0.toFixed(3)} → <b>${s.obj1.toFixed(3)}</b> <span class="sl-down">${arrow} ${word} ${pct.toFixed(1)}%</span></div>`;
+  if (opt) {
+    h += `<div class="sl-mut">离最优还差:|k−k*| = ${Math.abs(s.k1 - opt.k).toFixed(3)} , |b−b*| = ${Math.abs(s.b1 - opt.b).toFixed(3)}</div>`;
+    if (s.probeK < 1e-3 && s.probeB < 1e-3) h += `<div class="sl-done">试探步长≈0,已收敛到最优 ✓</div>`;
+  }
+  el.innerHTML = h;
 }
 
 // ---- 小工具 ----
 const set = (id, txt) => { document.getElementById(id).textContent = txt; };
 const checked = id => document.getElementById(id).checked;
+// 带正负号,负号用真减号
+const signed = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(3);
 
 // ---- 交互:拖拽 / 点空白加点 / 双击删点 ----
 function mousePressed() {
   viz.onPressed();
-  if (viz.isDragging()) { fitting = false; return; }   // 用户接管,停掉动画
+  if (viz.isDragging()) { resetStep(); return; }       // 用户接管,清空拟合进度
   if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height) return;
   if (ptNames.length >= MAX_PTS) return;
   const u = viz.toUnits(viz.toLocal(mouseX, mouseY));
   addPoint(Math.round(u.x * 2) / 2, Math.round(u.y * 2) / 2);   // 吸附到 0.5
-  fitting = false;
+  resetStep();
 }
 function mouseDragged() { viz.onDragged(); }
 function mouseReleased() { viz.onReleased(); }
@@ -214,6 +330,7 @@ function doubleClicked() {
     if (p5.Vector.dist(m, s) < 16) {
       viz.removeHandle(ptNames[i]);
       ptNames.splice(i, 1);
+      resetStep();
       return;
     }
   }
