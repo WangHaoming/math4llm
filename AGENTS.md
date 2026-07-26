@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-本文件供 Claude Code 每次执行任务时读取,记录本项目的目标与约定。
+本文件供 Codex 每次执行任务时读取,记录本项目的目标与约定。
 
 ## 项目目标
 
@@ -29,7 +29,7 @@
 math4llm/
 ├── index.html              # 首页:所有 demo 的导航卡片
 ├── README.md               # 面向开发者的项目说明
-├── CLAUDE.md               # 本文件
+├── AGENTS.md               # 本文件
 ├── shared/                 # 公共层,所有 demo 复用
 │   ├── style.css           # 全局样式(首页卡片 + demo 面板)
 │   ├── math-canvas.js      # MathViz:网格/坐标轴/坐标变换/箭头/可拖拽端点
