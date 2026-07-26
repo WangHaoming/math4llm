@@ -482,3 +482,66 @@ https://wanghaoming.github.io/math4llm/(各 demo README 已链此)。
 (MathViz 2D / WEBGL 3D / 原生 canvas);更新目录树(补 README、CLAUDE/AGENTS、
 标注 sketch.js 结构可不同);保留 MathViz 模板与 API 速查,并注明 3D/NN demo
 可不套 MathViz。仅改 README.md 一个文件,未改代码,无需运行验证。
+
+---
+
+## 2026-07-26 · least-squares README 纠错
+
+**初始理解**:用户要求审阅 `demos/least-squares/README.md` 找问题。逐行核对了
+README 与 `sketch.js`、`index.html`,并交叉核对三个兄弟 demo 与本目录 `claude.md`。
+共找出 20 项问题,其中硬性错误 5 项。
+
+**关键发现**:
+- A1 §四 中位数论证符号写反:同句内先说"左增右减",结论却写成 `(右 − 左)`。
+- A2 §3.1 唯一的"碗"字符画画成了开口向下的山丘,`*`(标为"碗底")不在最低处。
+- A3 "让 SAE 最小的直线一定恰好穿过至少两个点"表述过强(应为存在性),
+  且"恰好"与"至少"自相矛盾;`sketch.js:146` 注释同款。
+- A4 x 全相同时说成"最优不存在",实为参数不可辨识(解不唯一)。
+- A5 残差与残差绝对值混用。
+- B1 代码有 `PROBE_GROW = 1.3`(成功时步长放大),README 只讲减半,面板却会显示 δ 变大。
+- C1 `orthogonal-projection/README.md:137` 声称本文推导过 XᵀXθ=Xᵀy 的矩阵形式,
+  本文实际没有 —— 跨文档引用落空。
+
+**变更计划**(用户确认范围:只修错,不做结构性扩写):
+1. `README.md`:修 A1–A5、B1–B2、C2 链接、E1–E6 体例;§五 末尾新增 5.1 矩阵小节兑现 C1。
+2. `sketch.js`:146 行注释同步改为存在性表述。
+3. `index.html`:53 行死文案与 `sketch.js:278` 统一。
+4. `claude2.md` 独有条目并入 `claude.md` 后删除该重复文件。
+
+**设计决策**:
+- "L1 基本无视离群点"按 correctness 做词级软化,但**保留**"紫线几乎不动"这类
+  对 demo 现象的描述 —— 在这个 8 点场景里它确实不动,是准确观察而非过度断言。
+- 新增的 5.1 矩阵小节顺带把"XᵀX 不可逆"与 A4 的 x 全相同退化情形挂钩,
+  让 3.1 闭式解、A4 退化、§五 投影三处一次收拢。
+- 本轮**不做**该目录 `claude.md` 里的扩写 backlog(闭式解入门解释、三点例子过渡、
+  L2 梯度对比),留待后续单独一轮。
+
+**总结**:待完成后补充。
+
+**已完成**:
+
+改动 4 个文件:
+- `demos/least-squares/README.md` —— 修 A1(中位数符号)、A2(碗的字符画改为开口向上,
+  五行散点对称于第 16 列)、A3(L1 两点性质改为存在性表述,并补一段说明"不是每条最优线
+  都必须穿过两点")、A4(x 全相同改述为"解不唯一 / 参数不可辨识",§3.1、§3.2、§七 三处
+  同步)、A5(残差 → 残差绝对值);B1(§6.1 与 §如何使用 补 PROBE_GROW 的步长放大行为)、
+  B2(补删点下限 2);C2(§五 开头加指向 orthogonal-projection demo 的链接);
+  E1–E4、E6(全角标点全部转半角、"的/地"、blockquote 空格、"三个按钮"列表拆出第 6 项、
+  代码块补 text 标记);D1 词级软化(表格"基本无视"→"受影响远小于 L2",并补一段
+  "不是不受影响,而是不被单个离群点支配");**新增 §5.1 矩阵形式**(设计矩阵 X、θ、
+  ŷ=Xθ、Xᵀ(y−Xθ)=0、XᵀXθ=Xᵀy、θ=(XᵀX)⁻¹Xᵀy),兑现 C1。
+- `demos/least-squares/sketch.js` —— `bestFitL1()` 上方注释同步改为存在性表述,
+  并把"无解"改为"k、b 无法确定"。仅注释,无逻辑改动。
+- `demos/least-squares/index.html` —— steplog 初始文案与 sketch.js 统一。
+- `demos/least-squares/claude.md` —— 并入 claude2.md 独有的 6 条建议,删除 claude2.md。
+
+**验证**:
+- `node --check sketch.js` 通过。
+- `python3 -m http.server` 起服务,页面 HTTP 200,serve 出的 HTML 含更新后文案。
+- 字符画列位用 awk 核对:五行散点分别在列 (4,28)(6,26)(9,23)(13,19) 与 `*`@16,
+  中心全部为 16,开口向上。
+- `grep '[，:;?!()]'` 确认全角标点已清零;`$$` 共 20 个(10 组配平)。
+- **未做**:浏览器实际渲染与交互验证 —— Chrome 扩展未连接,无法启动浏览器。
+  §5.1 新增的 bmatrix 公式在 GitHub/KaTeX 下的渲染效果未经肉眼确认。
+- **未做(本轮范围外)**:claude.md 里的扩写 backlog(闭式解入门解释、三点例子过渡到
+  n 维、L2 梯度对比 dL/de=2e vs ±1)。
