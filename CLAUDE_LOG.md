@@ -456,3 +456,29 @@ E. 面板加"显示合成路径 k·x + b·1"checkbox(默认开),画原点→k·x
   preset 1/2、窄屏(640px)均正常;标签与场景对齐;结束后已停掉本地服务器。
 - 遗留风险:交互手感(旋转、拖滑块的实时观感)未在真实浏览器里人工验证;
   标签投影依赖 p5 1.9.4 内部矩阵字段(CDN 已锁版本,升级 p5 时需回归)。
+
+---
+
+## 2026-07-26(续)重写根目录 README.md
+
+**初步理解**:根 README 严重过时——只列了 dot-product 一个 demo,而项目现已有
+4 个激活 demo(what-is-nn / dot-product / least-squares / orthogonal-projection)。
+技术栈也不再单一:dot-product、least-squares 用 p5.js + MathViz(2D);
+orthogonal-projection 用 p5.js WEBGL(3D,不走 MathViz);what-is-nn 是纯原生
+canvas 的独立互动长文(不依赖 p5/KaTeX/MathViz)。线上站点已在
+https://wanghaoming.github.io/math4llm/(各 demo README 已链此)。
+
+**变更计划**:重写根 README,保持"面向开发者"定位——新增在线地址、4 个 demo
+的列表(领域标签 + 一句话 + 串联脉络:点积埋投影伏笔 → 最小二乘回收 →
+正交投影讲透 → 神经网络里点积是核心运算)、按渲染方式如实区分技术栈、
+更新目录树、保留仍有效的 MathViz 模板与 API 速查并注明 3D/NN 为例外。
+只改 README.md 一个文件。
+
+**总结**:待完成后补充。
+
+**已完成**:重写 README.md。新增在线体验地址;用表格列出 4 个已上线 demo
+(领域 + 一句话 + 目录链接)与"规划中"的导数 demo;补一段串联脉络说明
+(点积→最小二乘→正交投影→神经网络);技术栈按渲染方式分三类如实说明
+(MathViz 2D / WEBGL 3D / 原生 canvas);更新目录树(补 README、CLAUDE/AGENTS、
+标注 sketch.js 结构可不同);保留 MathViz 模板与 API 速查,并注明 3D/NN demo
+可不套 MathViz。仅改 README.md 一个文件,未改代码,无需运行验证。
