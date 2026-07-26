@@ -43,9 +43,15 @@ function setup() {
 
   makeLabels();
 
-  // 支持 ?preset=n 直接打开某组数据(也方便截图验证)
-  const q = parseInt(new URLSearchParams(location.search).get('preset'));
+  // 支持 ?preset=n 直接打开某组数据、?kb=k,b 指定初始滑块(方便截图验证)
+  const params = new URLSearchParams(location.search);
+  const q = parseInt(params.get('preset'));
   applyPreset(Number.isInteger(q) ? ((q % PRESETS.length) + PRESETS.length) % PRESETS.length : 0);
+  const kb = (params.get('kb') || '').split(',').map(parseFloat);
+  if (kb.length === 2 && kb.every(Number.isFinite)) {
+    document.getElementById('kSlider').value = kb[0];
+    document.getElementById('bSlider').value = kb[1];
+  }
 
   document.getElementById('btnJump').onclick = () => {
     anim = { k0: currentK(), b0: currentB(), k1: data.kStar, b1: data.bStar, t0: millis(), dur: 700 };
@@ -477,8 +483,9 @@ function updateLabels(k, b, yh, e, t, corner, showPath, nearFoot) {
   placeLabel(labels.lOne, data.oneVec, true);
   placeLabel(labels.lPlane, planePoint(-data.aSpan * 0.72, data.b2Span * 0.72));
   labels.lE.style.color = residualColor(t).toString();
+  // 残差很短时(接近最优)不标,免得和 y、垂足的标签挤在一起
   const eMid = p5.Vector.lerp(yh, data.yVec, 0.5);
-  placeLabel(labels.lE, e.mag() > 0.25 ? eMid : null);
+  placeLabel(labels.lE, e.mag() > 0.8 ? eMid : null);
   // 合成路径的两段中点标签,只在路径可见且线段足够长时显示
   placeLabel(labels.lKx, showPath && corner.mag() > 0.6 ? p5.Vector.mult(corner, 0.5) : null, true);
   placeLabel(labels.lB1, showPath && Math.abs(b) > 0.35 ? p5.Vector.lerp(corner, yh, 0.5) : null, true);
