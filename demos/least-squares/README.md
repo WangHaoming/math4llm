@@ -72,8 +72,10 @@ $$e_i = y_i - (k x_i + b) \qquad \text{(第 i 个点的残差:实际值减预测
 $$\text{平方:}\ \mathrm{SSE}(k,b) = \sum_i e_i^2 \qquad\qquad \text{绝对值:}\ \mathrm{SAE}(k,b) = \sum_i |e_i|$$
 
 > SSE = Sum of Squared Errors,误差平方和,也常叫残差平方和;
+
 > SAE = Sum of Absolute Errors,绝对误差和,也常叫绝对残差和。
-> (请记住这两个缩写,后面会反复用到。)
+
+ (请记住这两个缩写,后面会反复用到。)
 
 这两种选择,就是本 demo 里绿线和紫线的全部分歧来源。
 
