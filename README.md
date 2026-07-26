@@ -7,7 +7,7 @@
 
 ## demo 一览
 
-首页 [`index.html`](index.html) 是所有 demo 的导航。当前已上线四个:
+首页 [`index.html`](https://wanghaoming.github.io/math4llm/) 是所有 demo 的导航。当前已上线四个:
 
 | demo | 领域 | 一句话 |
 |------|------|--------|
