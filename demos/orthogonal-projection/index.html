@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>正交投影 · 最小二乘的几何本质</title>
+  <link rel="stylesheet" href="../../shared/style.css" />
+
+  <!-- 第三方库:p5.js + KaTeX(CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+  <!-- 项目公共层(本 demo 的三维场景是专属能力,直接写在 sketch.js 里,不进 MathViz) -->
+  <script src="../../shared/katex-setup.js"></script>
+
+  <!-- 本 demo 专属样式:3D 场景内的悬浮标签 + 左上角 2D 小窗 -->
+  <style>
+    .canvas-holder { position: relative; }
+    /* 场景内标签层:sketch.js 每帧把世界坐标投影成屏幕坐标后摆放标签 */
+    #labelLayer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    #labelLayer .tag3d {
+      position: absolute; transform: translate(-50%, -130%);
+      font-size: 12px; font-weight: 600; white-space: nowrap;
+      padding: 1px 6px; border-radius: 6px;
+      background: rgba(15, 17, 23, .72);
+    }
+    #labelLayer .tag3d.small { font-size: 10.5px; font-weight: 400; padding: 0 4px; }
+    /* 左上角 2D 小窗:熟悉的"散点 + 拟合直线"视角,与滑块同步 */
+    #inset2d {
+      position: absolute; left: 12px; top: 12px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: rgba(17, 19, 28, .88);
+    }
+    #insetCap {
+      position: absolute; left: 12px; top: 186px;
+      font-size: 11px; color: var(--muted); pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="demo">
+    <div class="canvas-holder" id="canvas-holder">
+      <canvas id="inset2d" width="220" height="170"></canvas>
+      <div id="insetCap">熟悉的视角:同一组 (k, b)</div>
+      <div id="labelLayer"></div>
+    </div>
+
+    <section class="panel">
+      <a class="back" href="../../index.html">← 返回合集</a>
+      <h1>正交投影</h1>
+      <div class="sub">拖动画布旋转视角;拖动下面的 k、b 滑块,左上角小窗里的直线和 3D 里的黄色预测点会一起动</div>
+
+      <div class="row"><span class="k">数据点 (x, y)</span></div>
+      <div class="row"><span class="val" id="ptsText" style="font-size:12.5px">—</span></div>
+
+      <div class="row"><span class="k a">真实值向量 y</span><span class="val a" id="vY">—</span></div>
+      <div class="row"><span class="k b">方向向量 x</span><span class="val b" id="vX">—</span></div>
+      <div class="row"><span class="k lad">方向向量 1</span><span class="val lad" id="vOne">—</span></div>
+      <div class="row"><span class="k proj">当前预测 ŷ</span><span class="val proj" id="vYhat">—</span></div>
+      <div class="row"><span class="k sum">垂足 ŷ*(最优解)</span><span class="val sum" id="vYhatStar">—</span></div>
+
+      <div class="formula">$$ \hat{\mathbf y} = k\mathbf x + b\mathbf 1 $$</div>
+
+      <label>k = <span id="kVal">0.00</span></label>
+      <input type="range" id="kSlider" min="-1" max="4" step="0.01" value="0" style="width:100%" />
+      <label>b = <span id="bVal">0.00</span></label>
+      <input type="range" id="bSlider" min="-1" max="3" step="0.01" value="0" style="width:100%" />
+
+      <label><input type="checkbox" id="chkPath" checked />
+        显示合成路径(先走 k·x,再走 b·1)</label>
+
+      <div class="row"><span class="k">残差 e = y − ŷ(斜边)</span><span class="val" id="vE">—</span></div>
+      <div class="row"><span class="k">‖e‖²(= SSE)</span><span class="val" id="vSSE">—</span></div>
+      <div class="row"><span class="k">e · x</span><span class="val" id="vDotX">—</span></div>
+      <div class="row"><span class="k">e · 1</span><span class="val" id="vDot1">—</span></div>
+      <div class="row"><span class="k">残差垂直于平面的程度</span><span class="val" id="perpPct">—</span></div>
+
+      <button id="btnJump">跳到最优解(正交投影)</button>
+      <button id="btnReset" class="secondary">重置(退到滑块起点)</button>
+      <button id="btnPreset" class="secondary">换一组数据</button>
+
+      <div class="formula">
+        $$ \mathbf e \perp \text{模型平面} \iff \mathbf e\cdot\mathbf x = 0,\ \ \mathbf e\cdot\mathbf 1 = 0 $$
+      </div>
+      <div class="row"><span class="k">最优解 k*</span><span class="val" id="kStarText">—</span></div>
+      <div class="row"><span class="k">最优解 b*</span><span class="val" id="bStarText">—</span></div>
+
+      <div class="hint">
+        3D 里那个三角形:<span class="sum">绿色虚线</span>是 y 到平面的垂线(最短距离),
+        <span style="color:#ffa94d">橙色虚线</span>是躺在平面里的误差(拖滑块可以消掉的部分),
+        灰色实线(y 到 ŷ)是斜边——斜边永远比垂线长,所以最优预测只能是垂足。
+        拖动 k、b 让 ŷ 滑向绿色垂足,残差线变绿、e·x 和 e·1 同时归零的那一刻,
+        就是最小二乘解。
+      </div>
+    </section>
+  </main>
+
+  <script src="sketch.js"></script>
+</body>
+</html>

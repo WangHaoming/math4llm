@@ -11,6 +11,7 @@
 已规划/进行中的 demo:
 - ✅ 向量加法 · 点积(`demos/dot-product/`)
 - ✅ 回归 · 最小二乘法(`demos/least-squares/`)
+- ✅ 正交投影 · 最小二乘的几何本质(`demos/orthogonal-projection/`)
 - ⏳ 微分 · 导数
 - (后续持续增加)
 
